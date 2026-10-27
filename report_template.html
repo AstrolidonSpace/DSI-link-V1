@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Android Client USB Bug Report - ICD SPEC-REV 2.4</title>
+<style>
+  @page {
+    size: A4;
+    margin: 15mm 15mm 15mm 15mm;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #24292e;
+    line-height: 1.5;
+    font-size: 10pt;
+    margin: 0;
+    padding: 0;
+  }
+  .header-table {
+    width: 100%;
+    border-bottom: 2px solid #0366d6;
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+  }
+  .title {
+    font-size: 18pt;
+    font-weight: 700;
+    color: #1a1f2c;
+    margin: 0;
+  }
+  .subtitle {
+    font-size: 10pt;
+    color: #586069;
+    margin-top: 3px;
+  }
+  .meta-box {
+    background-color: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+  }
+  .meta-grid {
+    display: table;
+    width: 100%;
+  }
+  .meta-row {
+    display: table-row;
+  }
+  .meta-cell {
+    display: table-cell;
+    padding: 2px 8px;
+    font-size: 8.5pt;
+  }
+  .meta-label {
+    font-weight: 600;
+    color: #444d56;
+  }
+  .meta-val {
+    color: #0366d6;
+    font-family: Consolas, monospace;
+  }
+  .badge-critical {
+    background-color: #d73a49;
+    color: #ffffff;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 8pt;
+    display: inline-block;
+  }
+  h2 {
+    font-size: 12pt;
+    color: #1a1f2c;
+    border-bottom: 1px solid #eaecef;
+    padding-bottom: 4px;
+    margin-top: 18px;
+    margin-bottom: 8px;
+  }
+  h3 {
+    font-size: 10.5pt;
+    color: #0366d6;
+    margin-top: 12px;
+    margin-bottom: 4px;
+  }
+  p {
+    margin: 4px 0 8px 0;
+    font-size: 9pt;
+  }
+  .alert-box {
+    background-color: #fffbdd;
+    border: 1px solid #ffeef0;
+    border-left: 4px solid #f66a0a;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    font-size: 8.5pt;
+  }
+  .problem-card {
+    border: 1px solid #d1d5da;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    background: #ffffff;
+    page-break-inside: avoid;
+  }
+  .problem-header {
+    background-color: #f1f8ff;
+    border-bottom: 1px solid #d1d5da;
+    padding: 6px 12px;
+    font-weight: 600;
+    color: #0366d6;
+    font-size: 9.5pt;
+  }
+  .problem-body {
+    padding: 10px 12px;
+    font-size: 8.5pt;
+  }
+  pre {
+    background-color: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 4px;
+    padding: 8px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 7.5pt;
+    line-height: 1.35;
+    margin: 6px 0;
+    overflow-x: auto;
+  }
+  .diff-del {
+    color: #b31d28;
+    background-color: #ffeef0;
+    display: block;
+  }
+  .diff-add {
+    color: #22863a;
+    background-color: #f0fff4;
+    display: block;
+    font-weight: 600;
+  }
+  table.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 8.5pt;
+  }
+  table.summary-table th, table.summary-table td {
+    border: 1px solid #e1e4e8;
+    padding: 6px 8px;
+    text-align: left;
+  }
+  table.summary-table th {
+    background-color: #f6f8fa;
+    color: #24292e;
+    font-weight: 600;
+  }
+  .page-break {
+    page-break-before: always;
+  }
+  .footer {
+    text-align: center;
+    font-size: 7.5pt;
+    color: #6a737d;
+    margin-top: 15px;
+    border-top: 1px solid #e1e4e8;
+    padding-top: 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<table class="header-table">
+  <tr>
+    <td>
+      <div class="title">Engineering Audit & Bug Report</div>
+      <div class="subtitle">USB-CDC Communication Failure Analysis & Remediation Guide</div>
+    </td>
+    <td style="text-align: right; vertical-align: bottom;">
+      <span class="badge-critical">CRITICAL BLOCKER</span>
+    </td>
+  </tr>
+</table>
+
+<!-- Metadata Box -->
+<div class="meta-box">
+  <div class="meta-grid">
+    <div class="meta-row">
+      <div class="meta-cell"><span class="meta-label">Project:</span> <span class="meta-val">crazyflie-android-client</span></div>
+      <div class="meta-cell"><span class="meta-label">Target Hardware:</span> <span class="meta-val">Seeed Studio XIAO ESP32-C6</span></div>
+      <div class="meta-cell"><span class="meta-label">Interface:</span> <span class="meta-val">USB-CDC (ACM)</span></div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-cell"><span class="meta-label">Protocol Spec:</span> <span class="meta-val">ICD SPEC-REV 2.4</span></div>
+      <div class="meta-cell"><span class="meta-label">Encoding / CRC:</span> <span class="meta-val">COBS + CRC-16/CCITT-FALSE</span></div>
+      <div class="meta-cell"><span class="meta-label">Status:</span> <span class="meta-val" style="color:#d73a49;font-weight:bold;">0 Bytes Received / Failsafe</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Executive Summary -->
+<h2>1. Executive Summary</h2>
+<p>
+  During integration testing of the <b>Seeed Studio XIAO ESP32-C6</b> with the Android Client over direct USB-C OTG, the drone receiver remains in <b>Airborne Failsafe</b> because exactly <b>0 bytes</b> are received from the mobile application.
+</p>
+<p>
+  A source code audit of the Android repository revealed that the protocol structures (<code>EspIcdCommanderPacket</code>, <code>Cobs</code>, <code>Crc16Ccitt</code>) are mathematically correct according to <b>ICD SPEC-REV 2.4</b>. However, <b>four critical implementation defects</b> in device enumeration, USB interface claiming, and packet dispatching completely prevent the Android app from opening the USB port or transmitting any bytes to the ESP32.
+</p>
+
+<!-- Issues Summary Table -->
+<h2>2. Defects Overview</h2>
+<table class="summary-table">
+  <thead>
+    <tr>
+      <th style="width: 5%;">#</th>
+      <th style="width: 28%;">File Location</th>
+      <th style="width: 32%;">Defect Description</th>
+      <th style="width: 35%;">Direct System Consequence</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>1</b></td>
+      <td><code>MainActivity.java:746</code></td>
+      <td>Hardcoded Crazyradio Nordic VID <code>0x1915</code> / PID <code>0x7777</code> filter.</td>
+      <td>App detects ESP32 as "Unavailable", aborts USB open, and diverts to BLE.</td>
+    </tr>
+    <tr>
+      <td><b>2</b></td>
+      <td><code>UsbLinkAndroid.java:112</code></td>
+      <td>Hardcoded query to <code>getInterface(0)</code> expecting &ge; 2 endpoints.</td>
+      <td>ESP32 CDC Control Interface has only 1 endpoint; fails with "Could not find endpoints".</td>
+    </tr>
+    <tr>
+      <td><b>3</b></td>
+      <td><code>MainPresenter.java:224</code></td>
+      <td><code>sendPacket()</code> routed to disconnected <code>Crazyflie</code>/<code>RadioDriver</code>.</td>
+      <td><code>toCobsUsbFrame()</code> & <code>bulkWrite()</code> are dead code and never executed.</td>
+    </tr>
+    <tr>
+      <td><b>4</b></td>
+      <td><code>MainActivity.java:753</code></td>
+      <td><code>mTelemetryListener</code> is never registered with <code>UsbLinkAndroid</code>.</td>
+      <td>Uplink <code>0x51</code> telemetry frames received from ESP32 never reach the UI.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Deep Dive Section -->
+<h2>3. Detailed Defect Analysis &amp; Remediation</h2>
+
+<!-- Problem 1 -->
+<div class="problem-card">
+  <div class="problem-header">Defect 1: Hardcoded Crazyradio VID / PID Filter in USB Discovery</div>
+  <div class="problem-body">
+    <p><b>Root Cause:</b> <code>MainActivity.isCrazyradioAvailable()</code> specifically scans for Nordic Crazyradio VID <code>0x1915</code> and PID <code>0x7777</code>. Because Seeed Studio XIAO ESP32-C6 has VID <code>0x2886</code> (Seeed) or <code>0x303A</code> (Espressif) and PID <code>0x0048</code> / <code>0x1001</code>, discovery returns an empty list.</p>
+    <p>When the user presses the "Connect" button, the app evaluates <code>isCrazyradioAvailable() == false</code>, branches to <code>connectBlePreChecks()</code>, displays a toast <i>"USB OTG is the sole supported transport link."</i>, and terminates without attempting to open USB.</p>
+    <b>Recommended Patch in <code>MainActivity.java</code>:</b>
+<pre>
+<span class="diff-del">- List&lt;UsbDevice&gt; usbDeviceList = UsbLinkAndroid.findUsbDevices(usbManager, (short) Crazyradio.CRADIO_VID, (short) Crazyradio.CRADIO_PID);</span>
+<span class="diff-add">+ // Accept Seeed Studio (0x2886) and Espressif (0x303A) or any connected USB CDC device</span>
+<span class="diff-add">+ List&lt;UsbDevice&gt; usbDeviceList = UsbLinkAndroid.findEspOrCrazyDevices(usbManager);</span>
+  return !usbDeviceList.isEmpty();
+</pre>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- Problem 2 -->
+<div class="problem-card">
+  <div class="problem-header">Defect 2: USB CDC-ACM Multi-Interface &amp; Endpoint Enumeration Bug</div>
+  <div class="problem-body">
+    <p><b>Root Cause:</b> Under standard USB Communications Device Class (CDC ACM):
+    <ul>
+      <li><b>Interface 0</b> (Class 2, CDC Control): Contains only <b>1</b> Interrupt IN endpoint for status signals.</li>
+      <li><b>Interface 1</b> (Class 10, CDC Data): Contains <b>2</b> Bulk endpoints (Bulk IN &amp; Bulk OUT).</li>
+    </ul>
+    <code>UsbLinkAndroid.java</code> explicitly hardcodes:
+    <pre>mIntf = this.mUsbDevice.getInterface(0);
+if (mIntf.getEndpointCount() < 2) {
+    Log.e(LOG_TAG, "Could not find endpoints");
+    return;
+}</pre>
+    Because Interface 0 on ESP32-C6 has only 1 endpoint, this check fails 100% of the time, logging an error and aborting before claiming the interface or opening endpoints.</p>
+    <b>Recommended Patch in <code>UsbLinkAndroid.java</code>:</b>
+<pre>
+<span class="diff-del">- mIntf = this.mUsbDevice.getInterface(0);</span>
+<span class="diff-del">- if (mIntf.getEndpointCount() &lt; 2) { Log.e(LOG_TAG, "Could not find endpoints"); return; }</span>
+<span class="diff-add">+ // Search across all device interfaces for the CDC Data interface with Bulk IN and Bulk OUT</span>
+<span class="diff-add">+ UsbInterface dataInterface = null;</span>
+<span class="diff-add">+ for (int i = 0; i &lt; mUsbDevice.getInterfaceCount(); i++) {</span>
+<span class="diff-add">+     UsbInterface iface = mUsbDevice.getInterface(i);</span>
+<span class="diff-add">+     UsbEndpoint in = null, out = null;</span>
+<span class="diff-add">+     for (int j = 0; j &lt; iface.getEndpointCount(); j++) {</span>
+<span class="diff-add">+         UsbEndpoint ep = iface.getEndpoint(j);</span>
+<span class="diff-add">+         if (ep.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {</span>
+<span class="diff-add">+             if (ep.getDirection() == UsbConstants.USB_DIR_IN) in = ep;</span>
+<span class="diff-add">+             if (ep.getDirection() == UsbConstants.USB_DIR_OUT) out = ep;</span>
+<span class="diff-add">+         }</span>
+<span class="diff-add">+     }</span>
+<span class="diff-add">+     if (in != null &amp;&amp; out != null) { dataInterface = iface; mEpIn = in; mEpOut = out; break; }</span>
+<span class="diff-add">+ }</span>
+<span class="diff-add">+ if (dataInterface == null) { throw new IOException("No bulk data interface found"); }</span>
+<span class="diff-add">+ mIntf = dataInterface;</span>
+</pre>
+  </div>
+</div>
+
+<!-- Problem 3 -->
+<div class="problem-card">
+  <div class="problem-header">Defect 3: Packet Pipeline Bypass (toCobsUsbFrame &amp; bulkWrite Never Called)</div>
+  <div class="problem-body">
+    <p><b>Root Cause:</b> Commit <code>6365c77</code> created <code>EspIcdCommanderPacket.toCobsUsbFrame()</code> and <code>UsbLinkAndroid.bulkWrite()</code>, but failed to connect them to the joystick transmission loop.</p>
+    <p>In <code>MainPresenter.startSendJoystickDataThread()</code>:
+    <pre>EspIcdCommanderPacket icdPacket = new EspIcdCommanderPacket(...);
+sendPacket(icdPacket); // Invokes mCrazyflie.sendPacket()</pre>
+    In <code>Crazyflie.java</code>:
+    <pre>public void sendPacket(CrtpPacket packet) {
+    if (mDriver.isConnected()) { // Evaluates to FALSE! No Crazyradio dongle attached
+        mDriver.sendPacket(packet);
+    }
+}</pre>
+    Because <code>mDriver</code> is an uninitialized <code>RadioDriver</code>, all packets are dropped silently. <code>toCobsUsbFrame()</code> is never called, and no bytes are ever written to USB.</p>
+    <b>Recommended Patch in <code>MainPresenter.java</code>:</b>
+<pre>
+  EspIcdCommanderPacket icdPacket = new EspIcdCommanderPacket(
+          rollNorm, pitchNorm, yawNorm, thrustNorm,
+          aux1, aux2, aux3, aux4, aux5
+  );
+<span class="diff-del">- sendPacket(icdPacket);</span>
+<span class="diff-add">+ // Direct USB-CDC Transmission according to ICD SPEC-REV 2.4</span>
+<span class="diff-add">+ if (mUsbLink != null && mUsbLink.isUsbConnected()) {</span>
+<span class="diff-add">+     byte[] usbFrame = icdPacket.toCobsUsbFrame();</span>
+<span class="diff-add">+     mUsbLink.bulkWrite(usbFrame);</span>
+<span class="diff-add">+ }</span>
+</pre>
+  </div>
+</div>
+
+<!-- Problem 4 -->
+<div class="problem-card">
+  <div class="problem-header">Defect 4: Telemetry Listener Disconnected from UI Dashboard</div>
+  <div class="problem-body">
+    <p><b>Root Cause:</b> <code>UsbLinkAndroid</code> includes a background reader thread that successfully parses 6-byte telemetry (<code>0x51</code>) and invokes <code>mTelemetryListener.onTelemetryReceived(...)</code>. Additionally, <code>MainActivity.updateTelemetry(...)</code> was implemented to display live voltage and PPS.</p>
+    <p>However, <code>usbLink.setTelemetryListener(...)</code> is never called during initialization. As a result, even after downlink frames are fixed, the uplink telemetry from the ESP32 will not update the phone screen.</p>
+    <b>Recommended Fix:</b> In <code>MainActivity.java</code> or <code>MainPresenter.java</code>, register the listener upon establishing the connection:
+<pre>
+<span class="diff-add">mUsbLink.setTelemetryListener(new UsbLinkAndroid.TelemetryListener() {</span>
+<span class="diff-add">    @Override</span>
+<span class="diff-add">    public void onTelemetryReceived(int voltageMv, int currentMa, int pps) {</span>
+<span class="diff-add">        mainActivity.updateTelemetry(voltageMv, currentMa, pps);</span>
+<span class="diff-add">    }</span>
+<span class="diff-add">    @Override</span>
+<span class="diff-add">    public void onWatchdogTimeout() {</span>
+<span class="diff-add">        mainActivity.setLinkQualityText("LOST");</span>
+<span class="diff-add">    }</span>
+<span class="diff-add">});</span>
+</pre>
+  </div>
+</div>
+
+<!-- Verification Section -->
+<h2>4. Verification &amp; Validation Protocol</h2>
+<p>Once the Android team implements the four fixes above, verify the link end-to-end using the following steps:</p>
+<ol>
+  <li>Connect XIAO ESP32-C6 to the Android phone via USB OTG cable.</li>
+  <li>Ensure Android prompts for <b>"Allow app to access USB device"</b> and grant permission.</li>
+  <li>Open the app and observe the built-in LED on GPIO 15:
+    <ul>
+      <li><b>Cutoff (Throttle = 1000 &micro;s):</b> LED is completely OFF.</li>
+      <li><b>Mid Throttle (Throttle = 1500 &micro;s):</b> LED glows at ~25% brightness.</li>
+      <li><b>Full Throttle (Throttle = 2000 &micro;s):</b> LED glows at 100% full brightness.</li>
+    </ul>
+  </li>
+  <li>Connect phone browser to Wi-Fi <code>XIAO-C6-DEBUG</code> at <code>http://192.168.4.1</code> to confirm 50 PPS throughput and zero CRC errors.</li>
+</ol>
+
+<div class="footer">
+  ICD SPEC-REV 2.4 Bridge Compliance Report &bull; Generated for Mobile &amp; Embedded Engineering Team &bull; Confidential
+</div>
+
+</body>
+</html>
