@@ -21,8 +21,16 @@ struct UserInput {
   uint16_t pitch;            // 1000 - 2000 µs (1500 = Neutral Center)
   uint16_t yaw;              // 1000 - 2000 µs (1500 = Neutral Center)
   uint16_t throttle;         // 1000 - 2000 µs (1000 = Cutoff / Idle)
-  uint16_t aux_channels;     // 16-bit bitfield (Bit 0 = Primary Arming toggle)
-  bool     is_armed;         // Convenience flag: true when aux_channels bit 0 is set and link is active
+  uint16_t aux_channels;     // 16-bit raw bitfield
+
+  // Decoded individual AUX channels according to ICD SPEC-REV 2.4:
+  uint8_t  aux1;             // Bit 0 (1-bit: 0 or 1, Primary Arm switch)
+  uint8_t  aux2;             // Bits 1-3 (3-bit: 0 to 7)
+  uint8_t  aux3;             // Bits 4-6 (3-bit: 0 to 7)
+  uint8_t  aux4;             // Bits 7-9 (3-bit: 0 to 7)
+  uint8_t  aux5;             // Bits 10-15 (6-bit: 0 to 63)
+
+  bool     is_armed;         // Convenience flag: true when aux1 (bit 0) is set and link is active
   bool     is_connected;     // true when valid packets are being received within FAILSAFE_TIMEOUT_MS
   bool     failsafe;         // true when connection is lost (>250 ms without valid packet)
   bool     new_data;         // true for the loop cycle in which a new packet was received
@@ -44,6 +52,11 @@ extern const uint16_t &usb_roll;
 extern const uint16_t &usb_pitch;
 extern const uint16_t &usb_yaw;
 extern const uint16_t &usb_aux;
+extern const uint8_t  &usb_aux1;
+extern const uint8_t  &usb_aux2;
+extern const uint8_t  &usb_aux3;
+extern const uint8_t  &usb_aux4;
+extern const uint8_t  &usb_aux5;
 extern const bool     &usb_armed;
 extern const bool     &usb_connected;
 

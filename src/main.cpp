@@ -1,107 +1,121 @@
 /**
  * ============================================================================
- * Project:  DSI Link Drone Receiver & Throttle LED Indicator
- * Target:   Seeed Studio XIAO ESP32-C6
- * Protocol: Interface Control Document (ICD) SPEC-REV 2.4
- * 
- * Overview:
- *   - USB communication, COBS decoding, CRC checking, and telemetry are
- *     encapsulated in "usb_comm.h" / "usb_comm.cpp".
- *   - User inputs can be directly accessed via:
- *       • Struct:  `usb_input.throttle`, `usb_input.roll`, `usb_input.pitch`,
- *                  `usb_input.yaw`, `usb_input.aux_channels`, `usb_input.is_armed`
- *       • Aliases: `usb_throttle`, `usb_roll`, `usb_pitch`, `usb_yaw`,
- *                  `usb_aux`, `usb_armed`, `usb_connected`
- *   - Failsafe: automatically cuts throttle and resets arm state after >250ms.
- *   - Actuator: Built-in user LED on GPIO 15 glows proportionally to throttle.
+ * Project:  DSI Link Drone System (Dual-Role TX / RX Firmware)
+ * Target:   
+ *   - Transmitter (TX): Seeed Studio XIAO ESP32-C6 / ESP32-C3
+ *   - Receiver    (RX): ESP32 Dev Module (8-channel 12-bit PWM @ 50Hz)
  * ============================================================================
  */
 
 #include <Arduino.h>
+#include "config.h"
+
+#if defined(ROLE_RECEIVER)
+// ============================================================================
+// RECEIVER FIRMWARE (ESP32 Dev Module)
+// ============================================================================
+#include "rx_pwm.h"
+
+void setup() {
+  Serial.begin(115200);
+  delay(300); // Allow serial monitor time to establish connection
+
+  // Initialize 9-channel 12-bit @ 50Hz PWM and ESP-NOW Long Range receiver
+  rx_pwm_init();
+  Serial.println("[SYSTEM] Running as RECEIVER: 9-Channel 12-bit @ 50Hz PWM Active");
+}
+
+
+void loop() {
+  // 1. Manages failsafe timeout and 500ms telemetry uplink back to transmitter
+  rx_pwm_update();
+
+  // Note:
+  //   • Hardware PWM outputs on CH1-CH9 update automatically with every verified packet.
+  //   • Live channel states available anytime:
+  //       - rx_ch1_roll        (1000 - 2000 µs)
+  //       - rx_ch2_pitch       (1000 - 2000 µs)
+  //       - rx_ch3_throttle    (1000 - 2000 µs)
+  //       - rx_ch4_yaw         (1000 - 2000 µs)
+  //       - rx_ch5_aux1        (1000 / 2000 µs Arm switch)
+  //       - rx_ch6_aux2        (1000 - 2000 µs Mode switch)
+  //       - rx_ch7_aux3        (1000 - 2000 µs)
+  //       - rx_ch8_aux4        (1000 - 2000 µs)
+  //       - rx_ch9_aux5        (1000 - 2000 µs on GPIO 18)
+  //       - rx_raw_aux5        (raw 6-bit value: 0 - 63)
+  //       - rx_failsafe_active (bool, true if connection lost)
+
+}
+
+#else
+// ============================================================================
+// TRANSMITTER FIRMWARE (Seeed Studio XIAO ESP32-C6 / ESP32-C3)
+// ============================================================================
 #include "usb_comm.h"
+#include "espnow_link.h"
+#include <esp_arduino_version.h>
 
-// ============================================================================
-// Hardware Configuration
-// ============================================================================
-
-// On the Seeed Studio XIAO ESP32-C6, user LED is on GPIO 15 (Active-LOW)
 #ifndef LED_BUILTIN
   #define LED_BUILTIN 15
 #endif
 
-// LED PWM Parameters (LEDC Peripheral)
-#define LED_PWM_FREQ 5000  // 5 kHz PWM frequency (eliminates visible flicker)
-#define LED_PWM_RES  8     // 8-bit duty resolution (0 to 255)
+#define LED_PWM_FREQ    5000  // 5 kHz PWM frequency
+#define LED_PWM_RES     8     // 8-bit duty resolution (0 to 255)
+#define LED_PWM_CHANNEL 0     // Channel used for Arduino Core 2.x
 
-// ============================================================================
-// Actuator / Indicator Drivers
-// ============================================================================
-
-/**
- * Modulates the built-in LED brightness according to the throttle command.
- * 
- * Circuit Note:
- *   Active-LOW LED on XIAO ESP32-C6:
- *     - Output LOW  (0V)   -> Current flows, LED turns ON (100% brightness).
- *     - Output HIGH (3.3V) -> No current, LED turns OFF (0% brightness).
- * 
- * Inverted PWM Mapping:
- *   Duty Cycle = 255 - Brightness
- *   - At Cutoff (1000 µs): Brightness = 0   => Duty = 255 (LED OFF)
- *   - At Full   (2000 µs): Brightness = 255 => Duty = 0   (LED 100% ON)
- */
 static void updateLedThrottle(uint16_t throttle_us) {
   uint16_t clamped = constrain(throttle_us, THROTTLE_MIN, THROTTLE_MAX);
   float norm = (float)(clamped - THROTTLE_MIN) / (float)(THROTTLE_MAX - THROTTLE_MIN);
   uint8_t brightness = (uint8_t)(norm * norm * 255.0f);
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
   ledcWrite(LED_BUILTIN, 255 - brightness);
+#else
+  ledcWrite(LED_PWM_CHANNEL, 255 - brightness);
+#endif
 }
 
-// ============================================================================
-// System Setup
-// ============================================================================
 void setup() {
-  // Initialize USB-CDC interface at 115200 baud
+  // 1. Initialize native USB-CDC interface at 115200 baud
   usb_comm_init(115200);
 
-  // Initialize LEDC PWM channel on the built-in LED pin
-  ledcAttach(LED_BUILTIN, LED_PWM_FREQ, LED_PWM_RES);
+  // 2. Initialize ESP-NOW Long Range (LR) wireless link
+  //    Launches the strict 50Hz FreeRTOS task and registers telemetry callbacks
+  espnow_link_init();
 
-  // Default state: LED is OFF (Active-LOW => Duty = 255)
-  ledcWrite(LED_BUILTIN, 255);
+  // 3. Initialize LEDC PWM channel on the built-in LED pin
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  ledcAttach(LED_BUILTIN, LED_PWM_FREQ, LED_PWM_RES);
+  ledcWrite(LED_BUILTIN, 255); // LED OFF initially
+#else
+  ledcSetup(LED_PWM_CHANNEL, LED_PWM_FREQ, LED_PWM_RES);
+  ledcAttachPin(LED_BUILTIN, LED_PWM_CHANNEL);
+  ledcWrite(LED_PWM_CHANNEL, 255); // LED OFF initially
+#endif
+
+  Serial.println("[SYSTEM] Running as TRANSMITTER: USB Phone App <-> ESP-NOW 50Hz");
 }
 
-// ============================================================================
-// Main Execution Loop
-// ============================================================================
 void loop() {
-  // 1. Process incoming USB packets and handle failsafe timeout
+  // 1. Process incoming USB packets and handle phone failsafe watchdog
   usb_comm_update();
 
-  // 2. Control Actuators using user input variables:
-  //
-  // Available input variables:
-  //   • usb_throttle    (1000 - 2000 µs, 1000 = Cutoff)
-  //   • usb_roll        (1000 - 2000 µs, 1500 = Center)
-  //   • usb_pitch       (1000 - 2000 µs, 1500 = Center)
-  //   • usb_yaw         (1000 - 2000 µs, 1500 = Center)
-  //   • usb_aux         (16-bit aux bitfield)
-  //   • usb_armed       (bool, true if arm bit active)
-  //   • usb_connected   (bool, true if link is alive)
-  //
-  // Or via struct: `usb_input.throttle`, `usb_input.roll`, etc.
-
+  // 2. Local Actuator: Drive built-in LED according to user throttle
   if (usb_connected) {
-    // Drive LED brightness with the throttle input variable
     updateLedThrottle(usb_throttle);
   } else {
-    // Failsafe state: Link lost / timed out -> Extinguish LED
+    // Phone disconnected / timed out (>250ms) -> LED OFF
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
     ledcWrite(LED_BUILTIN, 255);
+#else
+    ledcWrite(LED_PWM_CHANNEL, 255);
+#endif
   }
 
-  // 3. Telemetry Uplink (Call whenever telemetry arrives from RX ESP32):
-  //    Example:
-  //      uint16_t battery_mv = 3850; // Millivolts from your RX ESP32
-  //      uint16_t current_ma = 1200; // Milliamperes from your RX ESP32
-  //      usb_comm_send_telemetry(battery_mv, current_ma);
+  // Note:
+  //   • Strict 50Hz ESP-NOW transmissions are executed automatically in the background
+  //     by the FreeRTOS task (espnow_50hz) in "espnow_link.cpp".
+  //   • Real-time drone telemetry (battery voltage, PPS) is automatically forwarded
+  //     to the Android phone app without colliding with incoming control packets.
 }
+
+#endif

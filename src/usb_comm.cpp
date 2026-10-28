@@ -53,6 +53,11 @@ UserInput usb_input = {
   .yaw              = 1500,
   .throttle         = THROTTLE_MIN,
   .aux_channels     = 0,
+  .aux1             = 0,
+  .aux2             = 0,
+  .aux3             = 0,
+  .aux4             = 0,
+  .aux5             = 0,
   .is_armed         = false,
   .is_connected     = false,
   .failsafe         = true,
@@ -67,8 +72,14 @@ const uint16_t &usb_roll      = usb_input.roll;
 const uint16_t &usb_pitch     = usb_input.pitch;
 const uint16_t &usb_yaw       = usb_input.yaw;
 const uint16_t &usb_aux       = usb_input.aux_channels;
+const uint8_t  &usb_aux1      = usb_input.aux1;
+const uint8_t  &usb_aux2      = usb_input.aux2;
+const uint8_t  &usb_aux3      = usb_input.aux3;
+const uint8_t  &usb_aux4      = usb_input.aux4;
+const uint8_t  &usb_aux5      = usb_input.aux5;
 const bool     &usb_armed     = usb_input.is_armed;
 const bool     &usb_connected = usb_input.is_connected;
+
 
 // ============================================================================
 // Internal State & Mutexes
@@ -171,11 +182,20 @@ static void processValidPacket(const uint8_t *payload) {
   usb_input.yaw              = cmd.yaw;
   usb_input.throttle         = cmd.throttle;
   usb_input.aux_channels     = cmd.aux_channels;
-  usb_input.is_armed         = (cmd.aux_channels & 0x01) != 0;
+
+  // Decode individual AUX channels per ICD SPEC-REV 2.4:
+  usb_input.aux1             = cmd.aux_channels & 0x01;
+  usb_input.aux2             = (cmd.aux_channels >> 1) & 0x07;
+  usb_input.aux3             = (cmd.aux_channels >> 4) & 0x07;
+  usb_input.aux4             = (cmd.aux_channels >> 7) & 0x07;
+  usb_input.aux5             = (cmd.aux_channels >> 10) & 0x3F;
+
+  usb_input.is_armed         = (usb_input.aux1 != 0);
   usb_input.is_connected     = true;
   usb_input.failsafe         = false;
   usb_input.new_data         = true;
   usb_input.last_packet_time = millis();
+
 
   g_packet_counter++;
 
