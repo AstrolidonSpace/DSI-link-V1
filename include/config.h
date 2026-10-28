@@ -47,5 +47,13 @@ static const uint8_t RX_PWM_PINS[RX_NUM_CHANNELS] = {
 #define RX_BATTERY_PIN         34
 #define RX_BATTERY_DIVIDER     4.65f // Standard voltage divider ratio (e.g. 10k / 2.7k)
 
+// Connection Status Indicator LED (GPIO 2 - Onboard Blue LED on ESP32 Dev Module)
+// Outputs HIGH when linked with transmitter, LOW during failsafe/disconnected.
+#define RX_STATUS_PIN          2
+
+// RX Telemetry uplink interval in milliseconds (100ms = 10Hz)
+#define RX_TELEMETRY_INTERVAL_MS 100
+
 // RX Failsafe timeout in milliseconds
 #define RX_FAILSAFE_TIMEOUT_MS 500
+
