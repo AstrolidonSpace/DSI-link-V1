@@ -5,6 +5,8 @@
 [![Rate](https://img.shields.io/badge/Link%20Rate-50Hz%20Deterministic-brightgreen)](#)
 [![Telemetry](https://img.shields.io/badge/Telemetry-10Hz%20Uplink-green)](#)
 [![PWM](https://img.shields.io/badge/PWM%20Output-9--CH%2012--Bit%20%40%2050Hz-purple)](#)
+[![Product](https://img.shields.io/badge/AstrolidonSpace-Proprietary%20Product-critical)](#)
+
 
 A high-performance, deterministic 50Hz wireless flight control and 10Hz telemetry bridge built for RC aircraft, multirotors, and robotics. DSI Link V1 connects an Android Ground Control Station (GCS) or mobile transmitter to an airborne receiver with ultra-low latency, hardware failsafes, and bidirectional data link using ESP-NOW in Long-Range (LR) mode.
 
@@ -303,7 +305,8 @@ Safety is built into every layer of DSI Link:
 
 ---
 
-## License
+## Copyright & Proprietary Notice
 
-This project is open-source and released under the **MIT License**.
-Developed with ❤️ by [AstrolidonSpace](https://github.com/AstrolidonSpace).
+**Copyright © 2026 AstrolidonSpace. All Rights Reserved.**
+
+This firmware, protocol specification, and documentation constitute proprietary intellectual property of **AstrolidonSpace**. This is a commercial product codebase. Unauthorized reproduction, distribution, reverse engineering, or unauthorized commercial deployment of this software without explicit written permission from AstrolidonSpace is strictly prohibited.
