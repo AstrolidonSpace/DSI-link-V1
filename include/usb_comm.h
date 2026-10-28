@@ -48,11 +48,11 @@ extern const bool     &usb_armed;
 extern const bool     &usb_connected;
 
 // ============================================================================
-// Function Declarations
+// USB Communication Functions
 // ============================================================================
 
 /**
- * Initializes the USB-CDC Serial interface and default state values.
+ * Initializes the USB-CDC Serial interface and internal synchronization primitives.
  * Call this in setup().
  * 
  * @param baud Baud rate (default: 115200).
@@ -69,17 +69,42 @@ void usb_comm_init(uint32_t baud = 115200);
 bool usb_comm_update();
 
 /**
- * Optionally configure telemetry values (e.g. from real ADC / battery sensors).
- * If left at 0, default simulated values (3.85V, current mapped to throttle) are sent.
+ * Transmits an ICD 0x51 CRTP telemetry frame over USB to the mobile app.
+ * Call this function whenever telemetry data arrives from your RX ESP32.
+ * 
+ * Collision Prevention & Performance:
+ *  - Full-Duplex Safe: USB CDC hardware uses separate IN/OUT endpoints, so sending
+ *    telemetry will NEVER corrupt or collide with incoming control commands.
+ *  - Mutex-Protected: Thread-safe if called from FreeRTOS tasks, ISR contexts, or UART callbacks.
+ *  - Atomic: The full COBS packet and delimiter are written together and flushed immediately.
+ * 
+ * @param voltage_mv Battery voltage in millivolts (e.g. 3850 for 3.85V, 7400 for 7.4V).
+ * @param current_ma Current draw in milliamperes (e.g. 1500 for 1.5A).
+ * @param pps        Optional: Link quality / Packets-Per-Second (0 to 255).
+ *                   Defaults to -1 to automatically use the live calculated link PPS.
+ * @return true if the frame was encoded and pushed over USB successfully.
+ */
+bool usb_comm_send_telemetry(uint16_t voltage_mv, uint16_t current_ma, int16_t pps = -1);
+
+/**
+ * Convenience overload: sends telemetry using default simulated or preset values.
+ * 
+ * @return true if sent successfully.
+ */
+bool usb_comm_send_telemetry();
+
+/**
+ * Enables or disables automatic telemetry echo on incoming command packets.
+ * Default is FALSE (disabled) so that you have 100% control over when telemetry is sent.
+ * 
+ * @param enable Set to true to automatically echo telemetry upon receiving every command.
+ */
+void usb_comm_enable_auto_telemetry(bool enable);
+
+/**
+ * Optionally configure default fallback telemetry values.
  * 
  * @param voltage_mv Battery voltage in millivolts.
  * @param current_ma Current draw in milliamperes.
  */
 void usb_comm_set_telemetry(uint16_t voltage_mv, uint16_t current_ma);
-
-/**
- * Constructs and transmits an ICD 0x51 CRTP telemetry frame over USB.
- * This is called automatically upon receiving each valid downlink command,
- * but can also be triggered manually if desired.
- */
-void usb_comm_send_telemetry();

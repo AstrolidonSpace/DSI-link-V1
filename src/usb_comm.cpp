@@ -7,6 +7,8 @@
  */
 
 #include "usb_comm.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 // Maximum buffer size for incoming COBS frames
 #define RX_BUF_SIZE 64
@@ -69,17 +71,20 @@ const bool     &usb_armed     = usb_input.is_armed;
 const bool     &usb_connected = usb_input.is_connected;
 
 // ============================================================================
-// Internal State & Buffers
+// Internal State & Mutexes
 // ============================================================================
-static uint8_t       g_rx_buf[RX_BUF_SIZE];
-static size_t        g_rx_idx = 0;
+static uint8_t           g_rx_buf[RX_BUF_SIZE];
+static size_t            g_rx_idx = 0;
 
-static uint32_t      g_packet_counter = 0; // Packets received during the current second
-static uint8_t       g_last_pps       = 0; // Packets-per-second computed for telemetry
-static unsigned long g_last_pps_calc  = 0; // Timer tracking PPS measurement interval
+static uint32_t          g_packet_counter = 0; // Packets received during the current second
+static uint8_t           g_last_pps       = 0; // Packets-per-second computed for telemetry
+static unsigned long     g_last_pps_calc  = 0; // Timer tracking PPS measurement interval
 
-static uint16_t      g_telemetry_voltage_mv = 0; // User-configured voltage override
-static uint16_t      g_telemetry_current_ma = 0; // User-configured current override
+static uint16_t          g_telemetry_voltage_mv = 0; // User-configured voltage override
+static uint16_t          g_telemetry_current_ma = 0; // User-configured current override
+static bool              g_auto_telemetry       = false; // Disabled by default: you control sending!
+
+static SemaphoreHandle_t g_tx_mutex = NULL; // Mutex preventing any transmission collision
 
 // ============================================================================
 // Integrity & Framing Utilities
@@ -174,8 +179,10 @@ static void processValidPacket(const uint8_t *payload) {
 
   g_packet_counter++;
 
-  // Respond with live telemetry uplink
-  usb_comm_send_telemetry();
+  // Only auto-send if explicitly enabled; otherwise user controls telemetry timing
+  if (g_auto_telemetry) {
+    usb_comm_send_telemetry();
+  }
 }
 
 // ============================================================================
@@ -188,6 +195,15 @@ void usb_comm_init(uint32_t baud) {
   g_packet_counter = 0;
   g_last_pps = 0;
   g_last_pps_calc = millis();
+
+  // Create mutex to ensure thread-safe and non-colliding writes
+  if (g_tx_mutex == NULL) {
+    g_tx_mutex = xSemaphoreCreateMutex();
+  }
+}
+
+void usb_comm_enable_auto_telemetry(bool enable) {
+  g_auto_telemetry = enable;
 }
 
 void usb_comm_set_telemetry(uint16_t voltage_mv, uint16_t current_ma) {
@@ -195,23 +211,20 @@ void usb_comm_set_telemetry(uint16_t voltage_mv, uint16_t current_ma) {
   g_telemetry_current_ma = current_ma;
 }
 
-void usb_comm_send_telemetry() {
+bool usb_comm_send_telemetry(uint16_t voltage_mv, uint16_t current_ma, int16_t pps) {
   TelemetryPayload telem;
   telem.crtp_header = 0x51; // ICD Telemetry Header
-
-  // Use configured voltage or fallback to nominal 3.85V battery
-  telem.voltage_mv = (g_telemetry_voltage_mv > 0) ? g_telemetry_voltage_mv : 3850;
-
-  // Use configured current or calculate simulated current based on throttle
-  if (g_telemetry_current_ma > 0) {
-    telem.current_ma = g_telemetry_current_ma;
+  telem.voltage_mv  = voltage_mv;
+  telem.current_ma  = current_ma;
+  
+  // Use user-provided PPS or fallback to the live measured incoming PPS
+  if (pps >= 0) {
+    telem.pps = (uint8_t)(pps > 255 ? 255 : pps);
   } else {
-    telem.current_ma = (uint16_t)map(usb_input.throttle, THROTTLE_MIN, THROTTLE_MAX, 200, 6500);
+    telem.pps = g_last_pps;
   }
 
-  telem.pps = g_last_pps;
-
-  // 1. Pack telemetry and append CRC-16
+  // 1. Pack telemetry payload and append CRC-16 (Little-Endian)
   uint8_t raw[sizeof(TelemetryPayload) + 2];
   memcpy(raw, &telem, sizeof(TelemetryPayload));
 
@@ -219,14 +232,35 @@ void usb_comm_send_telemetry() {
   raw[sizeof(TelemetryPayload)]     = (uint8_t)(crc & 0xFF);
   raw[sizeof(TelemetryPayload) + 1] = (uint8_t)((crc >> 8) & 0xFF);
 
-  // 2. COBS encode and append 0x00 delimiter
+  // 2. COBS encode into buffer and append 0x00 frame delimiter
   uint8_t cobs[32];
   size_t c_len = cobs_encode(raw, sizeof(raw), cobs);
   cobs[c_len++] = 0x00;
 
-  // 3. Write over USB-CDC
-  Serial.write(cobs, c_len);
-  Serial.flush();
+  // 3. Thread-safe atomic transmission over USB-CDC
+  // Note: USB CDC hardware uses separate IN/OUT endpoints, so sending never
+  // collides with or corrupts incoming Serial.read() bytes.
+  bool sent = false;
+  if (g_tx_mutex != NULL) {
+    if (xSemaphoreTake(g_tx_mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+      Serial.write(cobs, c_len);
+      Serial.flush(); // Push immediately to USB hardware with minimum latency
+      xSemaphoreGive(g_tx_mutex);
+      sent = true;
+    }
+  } else {
+    Serial.write(cobs, c_len);
+    Serial.flush();
+    sent = true;
+  }
+
+  return sent;
+}
+
+bool usb_comm_send_telemetry() {
+  uint16_t v = (g_telemetry_voltage_mv > 0) ? g_telemetry_voltage_mv : 3850;
+  uint16_t c = (g_telemetry_current_ma > 0) ? g_telemetry_current_ma : (uint16_t)map(usb_input.throttle, THROTTLE_MIN, THROTTLE_MAX, 200, 6500);
+  return usb_comm_send_telemetry(v, c, -1);
 }
 
 bool usb_comm_update() {

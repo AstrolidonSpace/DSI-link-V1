@@ -98,4 +98,10 @@ void loop() {
     // Failsafe state: Link lost / timed out -> Extinguish LED
     ledcWrite(LED_BUILTIN, 255);
   }
+
+  // 3. Telemetry Uplink (Call whenever telemetry arrives from RX ESP32):
+  //    Example:
+  //      uint16_t battery_mv = 3850; // Millivolts from your RX ESP32
+  //      uint16_t current_ma = 1200; // Milliamperes from your RX ESP32
+  //      usb_comm_send_telemetry(battery_mv, current_ma);
 }
