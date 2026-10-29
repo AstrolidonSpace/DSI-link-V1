@@ -26,8 +26,8 @@
 #define TX_MODE_WEB_DEBUG  2
 
 #ifndef TX_OPERATION_MODE
-  #define TX_OPERATION_MODE  TX_MODE_WEB_DEBUG   // <-- Active: Web Debug Page (http://192.168.4.1)
-  //#define TX_OPERATION_MODE  TX_MODE_TRANSMIT  // <-- Uncomment for normal 50Hz ESP-NOW transmission
+  //#define TX_OPERATION_MODE  TX_MODE_WEB_DEBUG   // <-- Active: Web Debug Page (http://192.168.4.1)
+  #define TX_OPERATION_MODE  TX_MODE_TRANSMIT  // <-- Uncomment for normal 50Hz ESP-NOW transmission
 #endif
 
 // Wi-Fi SoftAP credentials for Web Debug mode

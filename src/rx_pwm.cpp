@@ -133,17 +133,17 @@ static void onRxDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, i
       // CH5 (AUX 1 - Arm): Bit 0 (1-bit: 0 or 1)
       rx_state.channels[4] = (pkt.aux_channels & 0x0001) ? 2000 : 1000;
 
-      // CH6 (AUX 2): Bits 1-3 (3-bit: 0 to 7)
+      // CH6 (AUX 2): Bits 1-3 (3-bit: 0 to 7). Binary switch (0 or 1) outputs 1000/2000; multi-step maps 0..7
       uint8_t aux2 = (pkt.aux_channels >> 1) & 0x07;
-      rx_state.channels[5] = map(aux2, 0, 7, 1000, 2000);
+      rx_state.channels[5] = (aux2 == 0) ? 1000 : ((aux2 == 1 || aux2 == 7) ? 2000 : map(aux2, 0, 7, 1000, 2000));
 
       // CH7 (AUX 3): Bits 4-6 (3-bit: 0 to 7)
       uint8_t aux3 = (pkt.aux_channels >> 4) & 0x07;
-      rx_state.channels[6] = map(aux3, 0, 7, 1000, 2000);
+      rx_state.channels[6] = (aux3 == 0) ? 1000 : ((aux3 == 1 || aux3 == 7) ? 2000 : map(aux3, 0, 7, 1000, 2000));
 
       // CH8 (AUX 4): Bits 7-9 (3-bit: 0 to 7)
       uint8_t aux4 = (pkt.aux_channels >> 7) & 0x07;
-      rx_state.channels[7] = map(aux4, 0, 7, 1000, 2000);
+      rx_state.channels[7] = (aux4 == 0) ? 1000 : ((aux4 == 1 || aux4 == 7) ? 2000 : map(aux4, 0, 7, 1000, 2000));
 
       // CH9 (AUX 5): Bits 10-15 (6-bit: 0 to 63)
       s_raw_aux5 = (pkt.aux_channels >> 10) & 0x3F;

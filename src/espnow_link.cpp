@@ -248,8 +248,8 @@ void espnow_link_feed_usb_input(const UserInput &input) {
   uint16_t t   = THROTTLE_MIN;
   uint16_t aux = 0;
 
-  // Forward raw 2-byte channels when USB link is alive and drone is armed
-  if (input.is_connected && input.is_armed && !input.failsafe) {
+  // Forward raw 2-byte channels when USB link is alive and not in failsafe
+  if (input.is_connected && !input.failsafe) {
     r   = input.roll;
     p   = input.pitch;
     y   = input.yaw;
