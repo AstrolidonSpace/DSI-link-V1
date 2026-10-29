@@ -468,9 +468,9 @@ static void handleApiStatus() {
 
   // Decode PWM values for AUX channels
   uint16_t aux1_pwm = usb_aux1 ? 2000 : 1000;
-  uint16_t aux2_pwm = (usb_aux2 == 0) ? 1000 : ((usb_aux2 == 1 || usb_aux2 == 7) ? 2000 : map(usb_aux2, 0, 7, 1000, 2000));
-  uint16_t aux3_pwm = (usb_aux3 == 0) ? 1000 : ((usb_aux3 == 1 || usb_aux3 == 7) ? 2000 : map(usb_aux3, 0, 7, 1000, 2000));
-  uint16_t aux4_pwm = (usb_aux4 == 0) ? 1000 : ((usb_aux4 == 1 || usb_aux4 == 7) ? 2000 : map(usb_aux4, 0, 7, 1000, 2000));
+  uint16_t aux2_pwm = map(usb_aux2, 0, 7, 1000, 2000);
+  uint16_t aux3_pwm = map(usb_aux3, 0, 7, 1000, 2000);
+  uint16_t aux4_pwm = map(usb_aux4, 0, 7, 1000, 2000);
   uint16_t aux5_pwm = map(usb_aux5, 0, 63, 1000, 2000);
 
   uint32_t uptime_sec = millis() / 1000UL;
