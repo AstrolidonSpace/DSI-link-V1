@@ -80,6 +80,16 @@ const uint8_t  &usb_aux5      = usb_input.aux5;
 const bool     &usb_armed     = usb_input.is_armed;
 const bool     &usb_connected = usb_input.is_connected;
 
+// Diagnostics & metrics tracking
+UsbStats usb_stats = {
+  .raw_bytes     = 0,
+  .delimiters    = 0,
+  .valid_packets = 0,
+  .crc_errors    = 0,
+  .cobs_errors   = 0,
+  .len_errors    = 0
+};
+
 
 // ============================================================================
 // Internal State & Mutexes
@@ -196,6 +206,8 @@ static void processValidPacket(const uint8_t *payload) {
   usb_input.new_data         = true;
   usb_input.last_packet_time = millis();
 
+  usb_stats.valid_packets++;
+
 
   g_packet_counter++;
 
@@ -289,9 +301,11 @@ bool usb_comm_update() {
   // 1. Ingest incoming USB-CDC serial stream
   while (Serial.available() > 0) {
     uint8_t b = Serial.read();
+    usb_stats.raw_bytes++;
 
     // 0x00 delimiter marks the boundary of a COBS frame
     if (b == 0x00) {
+      usb_stats.delimiters++;
       if (g_rx_idx > 0) {
         uint8_t decoded[RX_BUF_SIZE];
         size_t dec_len = cobs_decode(g_rx_buf, g_rx_idx, decoded);
@@ -303,6 +317,14 @@ bool usb_comm_update() {
 
           if (rx_crc == calc_crc) {
             processValidPacket(decoded);
+          } else {
+            usb_stats.crc_errors++;
+          }
+        } else {
+          if (dec_len == 0) {
+            usb_stats.cobs_errors++;
+          } else {
+            usb_stats.len_errors++;
           }
         }
         g_rx_idx = 0; // Reset for next frame

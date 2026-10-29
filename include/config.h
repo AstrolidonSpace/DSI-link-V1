@@ -15,6 +15,26 @@
 #endif
 
 // ============================================================================
+// TRANSMITTER (TX) OPERATION MODE SELECTION
+// ============================================================================
+// When running as TRANSMITTER, choose operation mode:
+//   TX_MODE_TRANSMIT  (1) : Normal 50Hz ESP-NOW Long Range transmission to drone receiver.
+//   TX_MODE_WEB_DEBUG (2) : Wi-Fi Debug Web Page mode (AP: DSI-LINK-DEBUG, 192.168.4.1).
+//                           Hosts a live web dashboard to inspect all 9 channel values,
+//                           connection status, PPS, and USB packet statistics.
+#define TX_MODE_TRANSMIT   1
+#define TX_MODE_WEB_DEBUG  2
+
+#ifndef TX_OPERATION_MODE
+  #define TX_OPERATION_MODE  TX_MODE_WEB_DEBUG   // <-- Active: Web Debug Page (http://192.168.4.1)
+  //#define TX_OPERATION_MODE  TX_MODE_TRANSMIT  // <-- Uncomment for normal 50Hz ESP-NOW transmission
+#endif
+
+// Wi-Fi SoftAP credentials for Web Debug mode
+#define TX_WEB_SSID        "DSI-LINK-DEBUG"
+#define TX_WEB_PASSWORD    "12345678"
+
+// ============================================================================
 // RECEIVER (RX) CONFIGURATION - ESP32 Dev Module
 // ============================================================================
 #define RX_PWM_FREQ       50    // 50 Hz PWM frequency for servos / ESCs (20ms period)

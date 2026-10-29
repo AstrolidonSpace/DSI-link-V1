@@ -257,6 +257,22 @@ If compiling outside of PlatformIO (e.g. Arduino IDE), configure the role in [`i
 //#define ROLE_RECEIVER
 ```
 
+### Transmitter Operation Mode (Transmit vs. Live Web Debug)
+
+In [`include/config.h`](file:///c:/Users/dipan/OneDrive/Dokumen/PlatformIO/Projects/DSI%20link%20test/include/config.h), you can toggle between flight transmission and live web diagnostics:
+
+```c
+// Select ONE mode:
+#define TX_OPERATION_MODE  TX_MODE_TRANSMIT   // Standard 50Hz ESP-NOW LR wireless flight link
+//#define TX_OPERATION_MODE  TX_MODE_WEB_DEBUG // Live Wi-Fi AP + Web Dashboard at http://192.168.4.1
+```
+
+#### Web Debug Dashboard Features
+- **Wi-Fi AP:** `DSI-LINK-DEBUG` (Password: `12345678`)
+- **Dashboard URL:** `http://192.168.4.1`
+- **Real-time Live Channels:** CH1 (Roll), CH2 (Pitch), CH3 (Throttle % & µs), CH4 (Yaw), CH5 (Arm state), CH6–CH9 (AUX 2–5).
+- **Diagnostics:** Live PPS meter, connection status badge (Connected vs Failsafe), total valid frames, and CRC/COBS error tracking auto-refreshing at 10 Hz.
+
 ---
 
 ## Pairing & First-Time Setup

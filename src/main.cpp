@@ -52,8 +52,13 @@ void loop() {
 // TRANSMITTER FIRMWARE (Seeed Studio XIAO ESP32-C6 / ESP32-C3)
 // ============================================================================
 #include "usb_comm.h"
-#include "espnow_link.h"
 #include <esp_arduino_version.h>
+
+#if (TX_OPERATION_MODE == TX_MODE_WEB_DEBUG)
+  #include "web_debug.h"
+#else
+  #include "espnow_link.h"
+#endif
 
 #ifndef LED_BUILTIN
   #define LED_BUILTIN 15
@@ -78,9 +83,15 @@ void setup() {
   // 1. Initialize native USB-CDC interface at 115200 baud
   usb_comm_init(115200);
 
-  // 2. Initialize ESP-NOW Long Range (LR) wireless link
-  //    Launches the strict 50Hz FreeRTOS task and registers telemetry callbacks
+#if (TX_OPERATION_MODE == TX_MODE_WEB_DEBUG)
+  // 2. Initialize Wi-Fi SoftAP and Web Server Debug Dashboard
+  web_debug_init();
+  Serial.println("[SYSTEM] Running as TRANSMITTER (WEB DEBUG MODE): Open http://192.168.4.1");
+#else
+  // 2. Initialize ESP-NOW Long Range (LR) wireless link (50Hz FreeRTOS task)
   espnow_link_init();
+  Serial.println("[SYSTEM] Running as TRANSMITTER (TRANSMIT MODE): USB Phone App <-> ESP-NOW 50Hz");
+#endif
 
   // 3. Initialize LEDC PWM channel on the built-in LED pin
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
@@ -91,15 +102,18 @@ void setup() {
   ledcAttachPin(LED_BUILTIN, LED_PWM_CHANNEL);
   ledcWrite(LED_PWM_CHANNEL, 255); // LED OFF initially
 #endif
-
-  Serial.println("[SYSTEM] Running as TRANSMITTER: USB Phone App <-> ESP-NOW 50Hz");
 }
 
 void loop() {
   // 1. Process incoming USB packets and handle phone failsafe watchdog
   usb_comm_update();
 
-  // 2. Local Actuator: Drive built-in LED according to user throttle
+#if (TX_OPERATION_MODE == TX_MODE_WEB_DEBUG)
+  // 2. Serve HTTP dashboard requests
+  web_debug_update();
+#endif
+
+  // 3. Local Actuator: Drive built-in LED according to user throttle
   if (usb_connected) {
     updateLedThrottle(usb_throttle);
   } else {
@@ -113,7 +127,7 @@ void loop() {
 
   // Note:
   //   • Strict 50Hz ESP-NOW transmissions are executed automatically in the background
-  //     by the FreeRTOS task (espnow_50hz) in "espnow_link.cpp".
+  //     by the FreeRTOS task (espnow_50hz) in "espnow_link.cpp" when in TX_MODE_TRANSMIT.
   //   • Real-time drone telemetry (battery voltage, PPS) is automatically forwarded
   //     to the Android phone app without colliding with incoming control packets.
 }

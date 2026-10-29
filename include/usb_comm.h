@@ -45,6 +45,17 @@ struct UserInput {
 // 1. Primary structure holding all user inputs
 extern UserInput usb_input;
 
+// 1b. USB Communication Diagnostics & Packet Counters
+struct UsbStats {
+  uint32_t raw_bytes;
+  uint32_t delimiters;
+  uint32_t valid_packets;
+  uint32_t crc_errors;
+  uint32_t cobs_errors;
+  uint32_t len_errors;
+};
+extern UsbStats usb_stats;
+
 // 2. Direct individual variable aliases for maximum convenience:
 //    You can use these directly in your code (e.g. `usb_throttle`, `usb_roll`)
 extern const uint16_t &usb_throttle;
