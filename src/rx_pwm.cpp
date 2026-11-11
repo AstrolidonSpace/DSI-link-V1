@@ -6,6 +6,7 @@
  */
 
 #include "rx_pwm.h"
+#include "afh_link.h"
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
@@ -109,6 +110,10 @@ static void onRxDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, i
       // Successful connection achieved: Output HIGH on GPIO 2
       digitalWrite(RX_STATUS_PIN, HIGH);
 
+      // Synchronize with Adaptive Frequency Hopping (AFH) Master schedule
+      bool ch_changed = false;
+      uint8_t new_ch  = 1;
+      afh_manager.slave_on_packet(pkt.afh, ch_changed, new_ch);
 
       // Auto-pair with transmitter MAC address for return telemetry
       if (src_mac != nullptr && !rx_state.transmitter_paired) {
@@ -212,6 +217,9 @@ bool rx_pwm_init() {
   // 5. Register receive callback
   esp_now_register_recv_cb(onRxDataRecv);
 
+  // 6. Initialize Adaptive Frequency Hopping (AFH) Slave Engine
+  afh_manager.init(AFH_ROLE_RX_SLAVE, 1);
+
   g_last_telem_send = millis();
   Serial.println("[RX] 9-Channel 12-bit @ 50Hz PWM Receiver initialized.");
   return true;
@@ -220,7 +228,12 @@ bool rx_pwm_init() {
 void rx_pwm_update() {
   unsigned long now = millis();
 
-  // 1. Failsafe Watchdog (>500ms without packet)
+  // 1. Maintain Adaptive Frequency Hopping (AFH) dwell timing & sweep search recovery
+  bool ch_changed = false;
+  uint8_t new_ch  = 1;
+  afh_manager.slave_update(ch_changed, new_ch);
+
+  // 2. Failsafe Watchdog (>500ms without packet)
   if (!rx_state.failsafe && (now - rx_state.last_packet_time > RX_FAILSAFE_TIMEOUT_MS)) {
     rx_state.failsafe = true;
 
@@ -267,6 +280,8 @@ void rx_pwm_update() {
       telem.packet_id          = 0;
       telem.packet_count_500ms = (rx_state.pps / 2); // Converts so TX (packet_count * 2) matches 1-sec PPS
       telem.battery_mV         = rx_read_battery_mv();
+      telem.rx_channel         = afh_manager.getCurrentChannel();
+      telem.rx_rssi            = 0;
 
       esp_now_send(rx_state.transmitter_mac, (const uint8_t *)&telem, sizeof(telem));
     }

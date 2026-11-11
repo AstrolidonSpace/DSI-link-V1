@@ -49,6 +49,12 @@ static flight_control_packet_t s_control_data = {
   .yaw          = 1500,
   .throttle     = THROTTLE_MIN,
   .aux_channels = 0,
+  .afh          = {
+    .hop_epoch       = 0,
+    .current_channel = 1,
+    .next_channel    = 5,
+    .active_mask     = 0
+  },
   .crc          = 0
 };
 
@@ -92,6 +98,14 @@ bool espnow_verify_crc16(const flight_control_packet_t &packet) {
 }
 
 // ============================================================================
+// ESP-NOW Send Callback (Hardware MAC ACK feedback for AFH channel scoring)
+// ============================================================================
+static void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  (void)mac_addr;
+  afh_manager.master_record_ack(status == ESP_NOW_SEND_SUCCESS);
+}
+
+// ============================================================================
 // ESP-NOW Receive Callback (Supports both Arduino Core 2.x and 3.x)
 // ============================================================================
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
@@ -99,7 +113,7 @@ static void onDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingD
 #else
 static void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
 #endif
-  // Check if incoming payload matches the 5-byte telemetry structure
+  // Check if incoming payload matches the telemetry structure
   if (len == sizeof(telemetry_packet_t)) {
     telemetry_packet_t telem;
     memcpy(&telem, incomingData, sizeof(telemetry_packet_t));
@@ -110,9 +124,13 @@ static void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int
     drone_telemetry.last_packet_time = millis();
     drone_telemetry.is_connected     = true;
 
-    // Immediately forward telemetry to the mobile app over USB-CDC without collision
+    // Record telemetry feedback for AFH channel health evaluation
+    afh_manager.master_record_telemetry(telem.rx_channel, drone_telemetry.pps);
+
+    // Forward telemetry with current channel health score to the mobile app over USB-CDC
     if (s_usb_forward) {
-      usb_comm_send_telemetry(drone_telemetry.battery_mV, 0, drone_telemetry.pps);
+      int16_t link_health = (int16_t)afh_manager.getChannelHealth(afh_manager.getCurrentChannel());
+      usb_comm_send_telemetry(drone_telemetry.battery_mV, link_health, drone_telemetry.pps);
     }
   }
 }
@@ -130,23 +148,32 @@ static void espnow_tx_task(void *pvParameters) {
       espnow_link_feed_usb_input(usb_input);
     }
 
-    // 2. Fetch thread-safe copy of flight control packet and compute CRC-16
+    // 2. Step AFH state machine to determine hopping epoch, pre-announce next CH,
+    //    and tune the radio synthesizer if dwell boundary reached
+    afh_header_t afh_hdr;
+    bool ch_changed = false;
+    uint8_t new_ch = 1;
+    afh_manager.master_step(afh_hdr, ch_changed, new_ch);
+
+    // 3. Fetch thread-safe copy of flight control packet and compute CRC-16
     flight_control_packet_t packet_to_send;
     if (s_control_mutex != NULL && xSemaphoreTake(s_control_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
       s_control_data.packet_id++;
+      s_control_data.afh = afh_hdr;
       s_control_data.crc = espnow_calculate_crc16(s_control_data);
       packet_to_send = s_control_data;
       xSemaphoreGive(s_control_mutex);
     } else {
       s_control_data.packet_id++;
+      s_control_data.afh = afh_hdr;
       s_control_data.crc = espnow_calculate_crc16(s_control_data);
       packet_to_send = s_control_data;
     }
 
-    // 3. Transmit packet over ESP-NOW Long Range
+    // 4. Transmit packet over ESP-NOW Long Range
     esp_now_send(s_peer_mac, (const uint8_t *)&packet_to_send, sizeof(packet_to_send));
 
-    // 4. Check telemetry timeout (1200ms contract from ESPNOW_TX_telemetry)
+    // 5. Check telemetry timeout (1200ms contract from ESPNOW_TX_telemetry)
     if (drone_telemetry.is_connected && (millis() - drone_telemetry.last_packet_time > ESPNOW_DISCONNECT_TIMEOUT_MS)) {
       drone_telemetry.is_connected = false;
       drone_telemetry.battery_mV   = 0;
@@ -192,19 +219,25 @@ bool espnow_link_init(const uint8_t *peer_mac) {
     return false;
   }
 
-  // 4. Register receive callback for drone telemetry
+  // 4. Initialize Adaptive Frequency Hopping (AFH) Master Engine
+  afh_manager.init(AFH_ROLE_TX_MASTER, 1);
+
+  // 5. Register transmit callback for hardware MAC-level ACK tracking
+  esp_now_register_send_cb(onDataSent);
+
+  // 6. Register receive callback for drone telemetry
   esp_now_register_recv_cb(onDataRecv);
 
-  // 5. Register Peer Info
+  // 7. Register Peer Info
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, s_peer_mac, 6);
-  peerInfo.channel = 0;
+  peerInfo.channel = 0; // Follows current dynamic Wi-Fi PHY channel
   peerInfo.encrypt = false;
   if (!esp_now_is_peer_exist(s_peer_mac)) {
     esp_now_add_peer(&peerInfo);
   }
 
-  // 6. Launch strict 50Hz FreeRTOS task with high priority (priority 4)
+  // 8. Launch strict 50Hz FreeRTOS task with high priority (priority 4)
   if (s_tx_task_handle == NULL) {
     BaseType_t res = xTaskCreate(
       espnow_tx_task,

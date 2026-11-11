@@ -151,21 +151,29 @@ LiPo (+) ──[ 10kΩ ]──┬──[ 2.7kΩ ]── GND
 
 ## Protocol Specifications
 
-### 16-Byte Downlink Control Frame (50Hz)
+### 22-Byte Downlink Control Frame (50Hz with Adaptive Frequency Hopping)
 
 ```c
 #pragma pack(push, 1)
 typedef struct {
-  uint32_t packet_id;    // 4 Bytes: Incrementing sequence counter
-  uint16_t roll;         // 2 Bytes: Channel 1 (1000 - 2000 µs, 1500 = Center)
-  uint16_t pitch;        // 2 Bytes: Channel 2 (1000 - 2000 µs, 1500 = Center)
-  uint16_t yaw;          // 2 Bytes: Channel 3 (1000 - 2000 µs, 1500 = Center)
-  uint16_t throttle;     // 2 Bytes: Channel 4 (1000 - 2000 µs, 1000 = Cutoff)
-  uint16_t aux_channels; // 2 Bytes: Packed 16-bit auxiliary bitfield
-  uint16_t crc;          // 2 Bytes: CRC-16-CCITT over the first 14 bytes
+  uint32_t     packet_id;    // 4 Bytes: Incrementing sequence counter
+  uint16_t     roll;         // 2 Bytes: Channel 1 (1000 - 2000 µs, 1500 = Center)
+  uint16_t     pitch;        // 2 Bytes: Channel 2 (1000 - 2000 µs, 1500 = Center)
+  uint16_t     yaw;          // 2 Bytes: Channel 3 (1000 - 2000 µs, 1500 = Center)
+  uint16_t     throttle;     // 2 Bytes: Channel 4 (1000 - 2000 µs, 1000 = Cutoff)
+  uint16_t     aux_channels; // 2 Bytes: Packed 16-bit auxiliary bitfield
+  afh_header_t afh;          // 6 Bytes: Adaptive Frequency Hopping (epoch, cur_ch, next_ch, active_mask)
+  uint16_t     crc;          // 2 Bytes: CRC-16-CCITT over the first 20 bytes
 } flight_control_packet_t;
 #pragma pack(pop)
 ```
+
+### Adaptive Slow Frequency Hopping (AFH-SFH)
+- **Hop Rate**: 10 hops/sec (Dwell time: 5 packets @ 50 Hz = 100 ms per channel).
+- **Active Channel Pool**: 4 cleanest 20 MHz-spaced channels (e.g. 1, 5, 9, 13) selected dynamically from 13 available 2.4 GHz channels.
+- **Dynamic Jammer / Noise Eviction**: Master tracks hardware MAC ACKs and telemetry per channel via EWMA filter ($Q = 0.75 \times Q + 0.25 \times \text{rate}$). If channel health drops below 45%, it is evicted and replaced with a clean channel.
+- **In-Band Next-Hop Announcement**: Every packet pre-announces the next target channel (`next_channel`), ensuring zero desynchronization even under 80% packet loss.
+- **Sweep Recovery Mode**: If receiver loses signal for >300 ms, it performs a 110 ms channel sweep across the active pool, achieving deterministic reconnection within 400 ms.
 
 ### AUX Channel Bitfield Mapping (ICD SPEC-REV 2.4)
 

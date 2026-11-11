@@ -4,6 +4,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "usb_comm.h"
+#include "afh_link.h"
 
 // ============================================================================
 // Configuration & Timing Constants
@@ -24,30 +25,38 @@ extern const uint8_t DEFAULT_DRONE_MAC[6];
 #pragma pack(push, 1)
 
 /**
- * 16-byte Downlink Flight Control Packet sent to the drone at 50Hz:
+ * 22-byte Downlink Flight Control Packet sent to the drone at 50Hz:
  *  - 4-byte sequence ID (packet_id)
  *  - 4 channels (2 bytes each = 8 bytes): Roll, Pitch, Yaw, Throttle (1000 - 2000 µs)
  *  - 16-bit auxiliary channels bitfield (2 bytes): aux_channels
- *  - 2-byte CRC-16 checksum (crc) over the preceding 14 bytes
+ *  - 6-byte AFH synchronization header:
+ *      * 2-byte hop epoch
+ *      * 1-byte current channel
+ *      * 1-byte next channel
+ *      * 2-byte active channel bitmask
+ *  - 2-byte CRC-16 checksum (crc) over all preceding 20 bytes
  */
 typedef struct {
-  uint32_t packet_id;    // 4 bytes: Incrementing sequence counter
-  uint16_t roll;         // 2 bytes: Channel 1 (1000 - 2000 µs, 1500 = Center)
-  uint16_t pitch;        // 2 bytes: Channel 2 (1000 - 2000 µs, 1500 = Center)
-  uint16_t yaw;          // 2 bytes: Channel 3 (1000 - 2000 µs, 1500 = Center)
-  uint16_t throttle;     // 2 bytes: Channel 4 (1000 - 2000 µs, 1000 = Cutoff)
-  uint16_t aux_channels; // 2 bytes: 16-bit Auxiliary bitfield (Bit 0 = Arm)
-  uint16_t crc;          // 2 bytes: CRC-16 checksum of all preceding fields
+  uint32_t     packet_id;    // 4 bytes: Incrementing sequence counter
+  uint16_t     roll;         // 2 bytes: Channel 1 (1000 - 2000 µs, 1500 = Center)
+  uint16_t     pitch;        // 2 bytes: Channel 2 (1000 - 2000 µs, 1500 = Center)
+  uint16_t     yaw;          // 2 bytes: Channel 3 (1000 - 2000 µs, 1500 = Center)
+  uint16_t     throttle;     // 2 bytes: Channel 4 (1000 - 2000 µs, 1000 = Cutoff)
+  uint16_t     aux_channels; // 2 bytes: 16-bit Auxiliary bitfield (Bit 0 = Arm)
+  afh_header_t afh;          // 6 bytes: Adaptive Frequency Hopping sync header
+  uint16_t     crc;          // 2 bytes: CRC-16 checksum of all preceding fields
 } flight_control_packet_t;
 
 /**
- * 5-byte Uplink Telemetry Packet received from the drone:
- * Matches ESPNOW_TX_telemetry & ESPNOW_Rx_telemetry specification.
+ * 7-byte Uplink Telemetry Packet received from the drone:
+ * Matches ESPNOW_TX_telemetry & ESPNOW_Rx_telemetry specification + AFH metrics.
  */
 typedef struct {
   uint8_t  packet_id;          // Telemetry packet ID
   uint16_t packet_count_500ms; // Packets received by drone in previous 500ms window
   uint16_t battery_mV;         // Drone battery voltage in millivolts
+  uint8_t  rx_channel;         // Radio channel RX is currently tuned to
+  uint8_t  rx_rssi;            // Reserved link quality / RSSI indicator
 } telemetry_packet_t;
 
 #pragma pack(pop)

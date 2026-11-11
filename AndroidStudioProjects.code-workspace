@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../AndroidStudioProjects"
+		},
+		{
+			"name": "DSI link test",
+			"path": "."
+		},
+		{
+			"name": "Battary-Monitor V1",
+			"path": "../Battary-Monitor V1"
+		}
+	],
+	"settings": {}
+}

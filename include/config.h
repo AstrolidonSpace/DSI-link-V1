@@ -35,6 +35,12 @@
 #define TX_WEB_PASSWORD    "12345678"
 
 // ============================================================================
+// ADAPTIVE FREQUENCY HOPPING (AFH) CONFIGURATION
+// ============================================================================
+#define AFH_ENABLED            1    // 1 = Enable Adaptive Slow Frequency Hopping (10 hops/s)
+#define AFH_INITIAL_CHANNEL    1    // Default boot channel (1 - 13)
+
+// ============================================================================
 // RECEIVER (RX) CONFIGURATION - ESP32 Dev Module
 // ============================================================================
 #define RX_PWM_FREQ       50    // 50 Hz PWM frequency for servos / ESCs (20ms period)
