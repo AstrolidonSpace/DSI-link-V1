@@ -169,25 +169,28 @@ If the receiver experiences an extended loss of signal ($> 300\text{ ms}$ / 3 mi
 
 ### 2. Receiver (RX)
 
-The receiver runs on a standard **ESP32 Dev Module** (30-pin or 38-pin version). It outputs 9 independent PWM channels, monitors flight battery voltage, and provides a hardware link status LED.
+The receiver firmware supports both the classic **ESP32 Dev Module** and the high-performance **ESP32-S3** (e.g. ESP32-S3-DevKitC-1 or Seeed Studio XIAO ESP32-S3). It outputs 9 independent PWM channels, monitors flight battery voltage, and provides a hardware link status LED.
 
 #### RX Pinout Table
 
-| Channel | Function | Signal Pin (GPIO) | Pulse Range | Neutral / Failsafe |
-| :--- | :--- | :--- | :--- | :--- |
-| **CH 1** | **Roll** (Aileron) | **GPIO 13** | 1000 – 2000 µs | 1500 µs (Center) |
-| **CH 2** | **Pitch** (Elevator) | **GPIO 14** | 1000 – 2000 µs | 1500 µs (Center) |
-| **CH 3** | **Throttle** | **GPIO 27** | 1000 – 2000 µs | **1000 µs (Cutoff)** |
-| **CH 4** | **Yaw** (Rudder) | **GPIO 26** | 1000 – 2000 µs | 1500 µs (Center) |
-| **CH 5** | **AUX 1 (Arm Switch)** | **GPIO 25** | 1000 / 2000 µs | **1000 µs (Disarmed)** |
-| **CH 6** | **AUX 2 (Flight Mode)**| **GPIO 33** | 1000 – 2000 µs (8 levels)| 1000 µs |
-| **CH 7** | **AUX 3** | **GPIO 32** | 1000 – 2000 µs (8 levels)| 1000 µs |
-| **CH 8** | **AUX 4** | **GPIO 4**  | 1000 – 2000 µs (8 levels)| 1000 µs |
-| **CH 9** | **AUX 5** | **GPIO 18** | 1000 – 2000 µs (64 levels)| 1000 µs |
-| **STATUS**| **Link Status LED** | **GPIO 2** | **HIGH = Connected, LOW = Failsafe** | Onboard Blue LED |
-| **BATT** | **Battery Voltage ADC**| **GPIO 34** | 0 – 3.3V (Divider to LiPo) | Analog Input |
-| **VIN**  | **Power Supply (5V)**  | **5V / VIN** | 5.0V from BEC or ESC | Power In |
-| **GND**  | **Common Ground**      | **GND**      | Common ground with servos/ESC | Ground |
+| Channel | Function | Classic ESP32 Pin | ESP32-S3 Pin | Pulse Range | Neutral / Failsafe |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **CH 1** | **Roll** (Aileron) | **GPIO 13** | **GPIO 4** | 1000 – 2000 µs | 1500 µs (Center) |
+| **CH 2** | **Pitch** (Elevator) | **GPIO 14** | **GPIO 5** | 1000 – 2000 µs | 1500 µs (Center) |
+| **CH 3** | **Throttle** | **GPIO 27** | **GPIO 6** | 1000 – 2000 µs | **1000 µs (Cutoff)** |
+| **CH 4** | **Yaw** (Rudder) | **GPIO 26** | **GPIO 7** | 1000 – 2000 µs | 1500 µs (Center) |
+| **CH 5** | **AUX 1 (Arm Switch)** | **GPIO 25** | **GPIO 15**| 1000 / 2000 µs | **1000 µs (Disarmed)** |
+| **CH 6** | **AUX 2 (Flight Mode)**| **GPIO 33** | **GPIO 16**| 1000 – 2000 µs (8 levels)| 1000 µs |
+| **CH 7** | **AUX 3** | **GPIO 32** | **GPIO 17**| 1000 – 2000 µs (8 levels)| 1000 µs |
+| **CH 8** | **AUX 4** | **GPIO 4**  | **GPIO 18**| 1000 – 2000 µs (8 levels)| 1000 µs |
+| **CH 9** | **AUX 5** | **GPIO 18** | **GPIO 8** | 1000 – 2000 µs (64 levels)| 1000 µs |
+| **STATUS**| **Link Status LED** | **GPIO 2**  | **GPIO 2 / 21**| **HIGH = Connected, LOW = Failsafe** | Onboard LED |
+| **BATT** | **Battery Voltage ADC**| **GPIO 34** | **GPIO 1** | 0 – 3.3V (Divider to LiPo) | Analog Input (ADC1) |
+| **VIN**  | **Power Supply (5V)**  | **5V / VIN**| **5V / VIN**| 5.0V from BEC or ESC | Power In |
+| **GND**  | **Common Ground**      | **GND**     | **GND**    | Common ground with servos/ESC | Ground |
+
+> [!NOTE]
+> On the **ESP32-S3**, pins GPIO 19 and 20 are reserved for native USB, and GPIO 26–32 are reserved for Octal SPI Flash/PSRAM. The pinout is automatically selected at compile time based on the active target board.
 
 ```text
                   ESP32 Dev Module (Receiver Pinout)
@@ -210,14 +213,15 @@ The receiver runs on a standard **ESP32 Dev Module** (30-pin or 38-pin version).
                             └──────────────┘
 ```
 
-#### Battery Voltage Divider Circuit (Optional on GPIO 34)
+#### Battery Voltage Divider Circuit (Optional)
 
-To monitor a 1S–4S LiPo battery, wire a resistive divider to GPIO 34:
+To monitor a 1S–4S LiPo battery, wire a resistive divider to GPIO 34 (Classic ESP32) or GPIO 1 (ESP32-S3):
 ```text
 LiPo (+) ──[ 10kΩ ]──┬──[ 2.7kΩ ]── GND
                      │
-                     └──> GPIO 34 (ADC1_CH6)
+                     └──> ADC Pin (GPIO 34 on ESP32, GPIO 1 on ESP32-S3)
 ```
+*(Default divider multiplier in [`include/config.h`](file:///c:/Users/dipan/OneDrive/Dokumen/PlatformIO/Projects/DSI%20link%20test/include/config.h) is `4.65f`).*
 *(Default divider multiplier in [`include/config.h`](file:///c:/Users/dipan/OneDrive/Dokumen/PlatformIO/Projects/DSI%20link%20test/include/config.h) is `4.65f`).*
 
 ---
@@ -332,16 +336,23 @@ pio run -e seeed_xiao_esp32c3 -t upload
 
 ### Flashing the Receiver (RX)
 
-Connect your ESP32 Dev Module to your PC via Micro-USB / USB-C.
+Connect your receiver board (ESP32 Dev Module, ESP32-S3 DevKitC-1, or XIAO ESP32-S3) to your PC via USB.
 
 #### Using PlatformIO CLI:
 ```bash
+# For classic ESP32 Dev Module (GPIO 13, 14, 27, 26, 25, 33, 32, 4, 18):
 pio run -e rx-esp32dev -t upload
+
+# For generic ESP32-S3 DevKitC-1 (GPIO 4, 5, 6, 7, 15, 16, 17, 18, 8):
+pio run -e rx-esp32s3 -t upload
+
+# For Seeed Studio XIAO ESP32-S3:
+pio run -e rx-seeed-xiao-esp32s3 -t upload
 ```
 
 #### Using VS Code GUI:
 1. Open the PlatformIO tab on the left sidebar.
-2. Under **Project Tasks**, expand **rx-esp32dev**.
+2. Under **Project Tasks**, expand **rx-esp32dev**, **rx-esp32s3**, or **rx-seeed-xiao-esp32s3**.
 3. Click **Upload**.
 
 ---
@@ -349,7 +360,7 @@ pio run -e rx-esp32dev -t upload
 ### Switching Roles (TX vs RX)
 
 The codebase automatically selects the role based on the active PlatformIO environment:
-- Environment `rx-esp32dev` compiles as **Receiver** (`-D ROLE_RECEIVER`).
+- Environments `rx-esp32dev`, `rx-esp32s3`, and `rx-seeed-xiao-esp32s3` compile as **Receiver** (`-D ROLE_RECEIVER`).
 - Environments `seeed-xiao-esp32-c6` and `seeed_xiao_esp32c3` compile as **Transmitter** (`-D ROLE_TRANSMITTER`).
 
 If compiling outside of PlatformIO (e.g. Arduino IDE), configure the role in [`include/config.h`](file:///c:/Users/dipan/OneDrive/Dokumen/PlatformIO/Projects/DSI%20link%20test/include/config.h):
