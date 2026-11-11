@@ -63,7 +63,13 @@ void rx_pwm_write_channel(uint8_t ch, uint16_t pulse_us) {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
   ledcWrite(RX_PWM_PINS[ch], duty);
 #else
-  ledcWrite(ch, duty);
+  #if defined(CONFIG_IDF_TARGET_ESP32S3)
+    if (ch < 8) {
+      ledcWrite(ch, duty);
+    }
+  #else
+    ledcWrite(ch, duty);
+  #endif
 #endif
 }
 
@@ -172,8 +178,15 @@ bool rx_pwm_init() {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
     ledcAttach(pin, RX_PWM_FREQ, RX_PWM_RES);
 #else
+  #if defined(CONFIG_IDF_TARGET_ESP32S3)
+    if (i < 8) {
+      ledcSetup(i, RX_PWM_FREQ, RX_PWM_RES);
+      ledcAttachPin(pin, i);
+    }
+  #else
     ledcSetup(i, RX_PWM_FREQ, RX_PWM_RES);
     ledcAttachPin(pin, i);
+  #endif
 #endif
 
     // Initial safe outputs (Neutral center on flight channels, Cutoff on throttle)
